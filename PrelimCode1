@@ -1,0 +1,28 @@
+#include "BluetoothA2DPSink.h"
+
+BluetoothA2DPSink a2dp_sink;
+
+// Define the DAC output pins
+const int LEFT_DAC_PIN = 25;  // L+ to GPIO 25
+const int RIGHT_DAC_PIN = 26; // R+ to GPIO 26
+
+void setup() {
+    Serial.begin(115200);
+    
+    // Set the audio output pins to the ESP32's internal DAC
+    a2dp_sink.set_pin_config(i2s_pin_config_t{
+        .bck_io_num = I2S_PIN_NO_CHANGE,
+        .ws_io_num = I2S_PIN_NO_CHANGE,
+        .data_out_num = LEFT_DAC_PIN,  // Left Audio Output
+        .data_in_num = I2S_PIN_NO_CHANGE
+    });
+
+    // Start Bluetooth A2DP
+    a2dp_sink.start("ESP32_Audio_Receiver");
+
+    Serial.println("Bluetooth Audio Receiver Started");
+}
+
+void loop() {
+    // No need to add anything in the loop
+}
