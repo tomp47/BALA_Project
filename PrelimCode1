@@ -2,27 +2,48 @@
 
 BluetoothA2DPSink a2dp_sink;
 
-// Define the DAC output pins
-const int LEFT_DAC_PIN = 25;  // L+ to GPIO 25
-const int RIGHT_DAC_PIN = 26; // R+ to GPIO 26
+// Define a class that will handle audio output for the Bluetooth Sink
+class AudioOutput : public BluetoothA2DPOutput {
+public:
+    // Implement all the pure virtual functions from BluetoothA2DPOutput
+
+    bool begin() override {
+        // Initialization logic if needed
+        return true;
+    }
+
+    size_t write(const uint8_t *data, size_t len) override {
+        // Handle the audio data received
+        for (size_t i = 0; i < len; i++) {
+            dacWrite(25, data[i]); // Left audio output to GPIO 25
+            dacWrite(26, data[i]); // Right audio output to GPIO 26
+        }
+        return len; // Return the number of bytes written
+    }
+
+    void end() override {
+        // Cleanup logic if needed
+    }
+
+    void set_sample_rate(int rate) override {
+        // Set the audio sample rate if necessary
+    }
+
+    void set_output_active(bool active) override {
+        // Handle the output active state
+    }
+};
+
+AudioOutput audio_output_handler; // Create an instance of the audio output handler
 
 void setup() {
-    Serial.begin(115200);
-    
-    // Set the audio output pins to the ESP32's internal DAC
-    a2dp_sink.set_pin_config(i2s_pin_config_t{
-        .bck_io_num = I2S_PIN_NO_CHANGE,
-        .ws_io_num = I2S_PIN_NO_CHANGE,
-        .data_out_num = LEFT_DAC_PIN,  // Left Audio Output
-        .data_in_num = I2S_PIN_NO_CHANGE
-    });
+    // Initialize Bluetooth A2DP sink and set the audio output handler
+    a2dp_sink.set_output(audio_output_handler);
 
-    // Start Bluetooth A2DP
-    a2dp_sink.start("ESP32_Audio_Receiver");
-
-    Serial.println("Bluetooth Audio Receiver Started");
+    // Start Bluetooth A2DP Sink with device name
+    a2dp_sink.start("MyMusic");
 }
 
 void loop() {
-    // No need to add anything in the loop
+    delay(1000); // Keep running
 }
