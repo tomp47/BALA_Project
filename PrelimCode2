@@ -1,24 +1,56 @@
-/* 
-   Streaming audio from Bluetooth to ESP32 internal DAC 
-   Optimized for Left/Right Positive and Negative wiring
-*/
-
-#include "AudioTools.h"
 #include "BluetoothA2DPSink.h"
+#include "esp_bt.h"
+#include "esp_bt_main.h"
 
-// Define the audio output stream using DAC
-AnalogAudioStream out;
-BluetoothA2DPSink a2dp_sink(out);
+BluetoothA2DPSink a2dp_sink;
+
+// ✅ Callback for Bluetooth Connection Status
+void connection_state_changed(esp_a2d_connection_state_t state, void* ptr) {
+  if (state == ESP_A2D_CONNECTION_STATE_CONNECTED) {
+    Serial.println("✅ Bluetooth Connected");
+  } else if (state == ESP_A2D_CONNECTION_STATE_DISCONNECTED) {
+    Serial.println("⚠️  Disconnected. Reconnecting...");
+    delay(2000);  // Delay before attempting reconnection
+    a2dp_sink.start("ESP32_Headphones");
+  }
+}
 
 void setup() {
-    Serial.begin(115200);
+  Serial.begin(115200);  // ✅ Match this in Arduino Serial Monitor
 
-    // Start Bluetooth with the name "ESP32_Headphones"
-    a2dp_sink.start("ESP32_Headphones");
+  // ✅ Full Bluetooth Stack Reset
+  esp_bt_controller_mem_release(ESP_BT_MODE_BLE);
+  esp_bt_controller_enable(ESP_BT_MODE_CLASSIC_BT);
 
-    Serial.println("Bluetooth Audio Receiver Started");
+  // ✅ Bluetooth Configurations
+  a2dp_sink.set_auto_reconnect(true);
+  a2dp_sink.set_discoverability(ESP_BT_GENERAL_DISCOVERABLE);
+  a2dp_sink.set_on_connection_state_changed(connection_state_changed);
+
+  // ✅ Increase Buffer to Prevent Disconnection
+  esp_a2d_sink_set_delay_value(300);  // 300 ms buffer to handle signal delays
+
+  // ✅ Audio Configurations
+  a2dp_sink.set_volume(3);  // Lower output volume to reduce static
+
+  // ✅ Simplified Audio Processing
+  a2dp_sink.set_stream_reader([](const uint8_t* data, uint32_t len) {
+    static uint8_t prev = 0;
+    for (uint32_t i = 0; i < len; i++) {
+      uint8_t scaled_audio = data[i] / 6;      // Stronger attenuation to reduce static
+      uint8_t smoothed = (prev + scaled_audio) / 2;  // Basic smoothing
+      dacWrite(25, smoothed);  // Left Channel
+      dacWrite(26, smoothed);  // Right Channel
+      prev = smoothed;
+    }
+  });
+
+  // ✅ Start Bluetooth A2DP Sink
+  a2dp_sink.start("ESP32_Headphones");
+
+  Serial.println("🎧 Bluetooth Audio Receiver Started");
 }
 
 void loop() {
-    // No code needed in the loop, the ESP32 handles Bluetooth audio streaming
+  delay(1000);  // Keep running
 }
