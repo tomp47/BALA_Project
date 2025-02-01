@@ -1,0 +1,24 @@
+/* 
+   Streaming audio from Bluetooth to ESP32 internal DAC 
+   Optimized for Left/Right Positive and Negative wiring
+*/
+
+#include "AudioTools.h"
+#include "BluetoothA2DPSink.h"
+
+// Define the audio output stream using DAC
+AnalogAudioStream out;
+BluetoothA2DPSink a2dp_sink(out);
+
+void setup() {
+    Serial.begin(115200);
+
+    // Start Bluetooth with the name "ESP32_Headphones"
+    a2dp_sink.start("ESP32_Headphones");
+
+    Serial.println("Bluetooth Audio Receiver Started");
+}
+
+void loop() {
+    // No code needed in the loop, the ESP32 handles Bluetooth audio streaming
+}
