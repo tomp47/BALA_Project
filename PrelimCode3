@@ -1,0 +1,76 @@
+#include "BluetoothA2DPSink.h"
+#include "esp_bt.h"
+#include "esp_bt_main.h"
+#include "esp_task_wdt.h"
+
+BluetoothA2DPSink a2dp_sink;
+bool isConnected = false;  // State flag to track connection status
+
+// Callback for Bluetooth Connection Status
+void connection_state_changed(esp_a2d_connection_state_t state, void* ptr) {
+    switch (state) {
+        case ESP_A2D_CONNECTION_STATE_CONNECTED:
+            Serial.println("Bluetooth Connected");
+            isConnected = true;
+            break;
+        case ESP_A2D_CONNECTION_STATE_DISCONNECTED:
+            Serial.println("Disconnected. Reconnecting...");
+            isConnected = false;
+            a2dp_sink.start("ESP32_Headphones");  // Reconnect automatically
+            break;
+    }
+}
+
+// Audio processing callback: Adjust according to your I2S configuration
+void audio_data_callback(const uint8_t *data, uint32_t len) {
+    static uint8_t prev = 0;
+    for (uint32_t i = 0; i < len; i++) {
+        uint8_t scaled_audio = data[i] / 3;
+        uint8_t smoothed = (prev + scaled_audio) / 2;
+        dacWrite(25, smoothed);  // Left Channel
+        dacWrite(26, smoothed);  // Right Channel
+        prev = smoothed;
+    }
+}
+
+void setup() {
+    Serial.begin(115200);
+    Serial.println("Restarting Bluetooth...");
+
+    // Properly configure and initialize Bluetooth
+    esp_bt_controller_mem_release(ESP_BT_MODE_BLE);
+    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
+    if (esp_bt_controller_init(&bt_cfg) != ESP_OK) {
+        Serial.println("Bluetooth Controller Initialization failed");
+        return;
+    }
+    if (esp_bt_controller_enable(ESP_BT_MODE_CLASSIC_BT) != ESP_OK) {
+        Serial.println("Bluetooth Controller Enable failed");
+        return;
+    }
+
+    // Initialize watchdog timer to prevent system hangup
+    esp_task_wdt_config_t wdt_config = {
+        .timeout_ms = 10000, // Set timeout to 10 seconds
+        .trigger_panic = true // Enable panic on timeout
+    };
+    esp_task_wdt_init(&wdt_config);
+
+    // Set up A2DP sink
+    a2dp_sink.set_auto_reconnect(true);
+    a2dp_sink.set_discoverability(ESP_BT_GENERAL_DISCOVERABLE);
+    a2dp_sink.set_on_connection_state_changed(connection_state_changed);
+    a2dp_sink.set_stream_reader(audio_data_callback);  // Set the audio data processing callback
+
+    a2dp_sink.start("ESP32_Headphones");
+
+    Serial.println("Bluetooth Audio Receiver Started");
+}
+
+void loop() {
+    if (isConnected) {
+        Serial.println("Keep-alive: Maintaining connection...");
+        esp_task_wdt_reset();  // Reset watchdog timer
+    }
+    delay(5000);
+}
