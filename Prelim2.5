@@ -1,0 +1,56 @@
+#include "BluetoothA2DPSink.h"
+#include "esp_bt.h"
+#include "esp_bt_main.h"
+
+BluetoothA2DPSink a2dp_sink;
+bool isConnected = false;  // State flag to track connection status
+
+// Callback for Bluetooth Connection Status
+void connection_state_changed(esp_a2d_connection_state_t state, void* ptr) {
+  if (state == ESP_A2D_CONNECTION_STATE_CONNECTED) {
+    Serial.println("Bluetooth Connected");
+    isConnected = true;
+  } else if (state == ESP_A2D_CONNECTION_STATE_DISCONNECTED) {
+    Serial.println("Disconnected. Reconnecting...");
+    isConnected = false;
+    delay(2000);
+    a2dp_sink.start("ESP32_Headphones");  // Attempt to reconnect
+  }
+}
+
+// Keep-Alive to Prevent Disconnection
+void keep_alive() {
+  if (isConnected) {  // Only keep alive if connected
+    Serial.println("Keep-alive: Preventing Bluetooth Disconnection...");
+    a2dp_sink.set_auto_reconnect(true);
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  Serial.println("Restarting Bluetooth...");
+
+  // Ensure Bluetooth stack is properly reset
+  if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_ENABLED) {
+    esp_bt_controller_disable();
+    delay(1000);  // Ensure controller is properly disabled
+  }
+  esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
+  esp_bt_controller_init(&bt_cfg);
+  esp_bt_controller_enable(ESP_BT_MODE_CLASSIC_BT);
+
+  // Bluetooth Configurations
+  a2dp_sink.set_auto_reconnect(true);
+  a2dp_sink.set_discoverability(ESP_BT_GENERAL_DISCOVERABLE);
+  a2dp_sink.set_on_connection_state_changed(connection_state_changed);
+
+  // Start Bluetooth A2DP Sink
+  a2dp_sink.start("ESP32_Headphones");
+
+  Serial.println("Bluetooth Audio Receiver Started");
+}
+
+void loop() {
+  keep_alive();  // Run keep-alive to prevent disconnects
+  delay(5000);
+}
